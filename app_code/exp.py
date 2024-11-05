@@ -933,6 +933,7 @@ inputs = {
 col_info = {
 	'block' : {}
 	, 'trial_num' : {}
+	, 'trial_start_time' : {}
 	, 'target_location' : {
 		'mapping': {
 			'left': 1
