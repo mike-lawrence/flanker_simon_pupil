@@ -103,8 +103,8 @@ def set_realtime_priority(pid, priority=50):
 
 # Set real-time priority for the current process
 pid = os.getpid()
-# set_realtime_priority(pid, priority=50)
-# os.nice(-10)
+set_realtime_priority(pid, priority=50)
+os.nice(-10)
 
 
 ########
