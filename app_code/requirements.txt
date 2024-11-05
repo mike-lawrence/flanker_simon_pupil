@@ -1,0 +1,15 @@
+aggdraw
+bleak
+matplotlib
+numpy
+Pillow
+Pillow-SIMD
+psutil
+PySDL2
+pysdl2-dll
+sounddevice
+SoundFile
+pyusb
+zarr
+scipy
+opencv-python

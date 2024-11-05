@@ -1,0 +1,12 @@
+
+Should we attempt drift correct more than once before recalibrating?
+
+put shared code in a single "package"
+
+mirror window for exp
+
+investigate ongoing missed triggers
+try to improve pytracker inference
+add pytracker channel averages/differences
+extend LEDs
+fix sound
