@@ -40,7 +40,7 @@ def set_realtime_priority(pid, priority=50):
 # Set real-time priority for the current process
 pid = os.getpid()
 # set_realtime_priority(pid, priority=50)
-os.nice(-10)
+# os.nice(-10)
 
 #get current time for data file name
 if not os.path.exists('../data'):
