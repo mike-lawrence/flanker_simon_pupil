@@ -150,7 +150,7 @@ else:
 	#change directory to '../data/' + store_path_prefix + '_' + time_str
 	os.chdir(data_dir)
 	#compress store_path usinng 7z
-	os.system('7z a -tzip data.zarr.zip data.zarr/.')
+	os.system('7z a -tzip data.zarr.zip data.zarr/. > /dev/null') #run 7z and suppress stdout (but will still show stderr)
 	#delete store_path
 	shutil.rmtree('data.zarr')
 	# rename
