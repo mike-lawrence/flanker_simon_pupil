@@ -15,6 +15,7 @@ import sys
 import time
 import os
 import ctypes
+import threading
 
 # Constants for real-time policies
 SCHED_FIFO = 1
@@ -46,24 +47,46 @@ os.nice(-10)
 ########
 # Initialize camera
 ########
-vc = cv2.VideoCapture(cam_index,cv2.CAP_V4L)
-vc.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-vc.set(cv2.CAP_PROP_FRAME_WIDTH, cam_res[0])
-vc.set(cv2.CAP_PROP_FRAME_HEIGHT, cam_res[1])
-vc.set(cv2.CAP_PROP_FPS, cam_fps)
-print(f'camera resolution set to {vc.get(cv2.CAP_PROP_FRAME_WIDTH)}x{vc.get(cv2.CAP_PROP_FRAME_HEIGHT)}')
-print(f'camera framerate set to {vc.get(cv2.CAP_PROP_FPS)}')
-image_num = 0
 
 #define a function that gets the time (unit=seconds,zero=?)
 def get_time():
 	return time.perf_counter()
 
+
+class VideoCapture:
+	def __init__(self):
+		self.cap = cv2.VideoCapture(cam_index,cv2.CAP_V4L)
+		self.cap.set(cv2.CAP_PROP_FPS, cam_fps)
+		self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, cam_res[0])
+		self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cam_res[1])
+		self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+		self.t1 = get_time()
+		self.ret, self.frame = self.cap.read()
+		self.t2 = get_time()
+		self.stopped = False
+		self.image_num = 1
+	def start(self):
+		threading.Thread(target=self.update, daemon=True).start()
+		return(self)
+	def update(self):
+		while not self.stopped:
+			self.t1 = get_time()
+			self.ret, self.frame = self.cap.read()
+			self.t2 = get_time()
+			self.image_num += 1
+	def read(self):
+		return([self.ret, self.frame, self.image_num, self.t1, self.t2])
+	def stop(self):
+		self.stopped = True
+		self.cap.release()
+
+cap = VideoCapture().start()
+
 #define a function to exit safely
 def exit_safely():
 	tx_dict['parent'].put(kind='stop')
 	debug.print('releasing')
-	vc.release()
+	cap.stop()
 	debug.print('exiting')
 	sys.exit()
 	debug.print('exited')
@@ -96,11 +119,8 @@ while True:
 	# check_for_renice()
 
 	#poll the camera
-	t1 = get_time() #time right before requesting the image
-	_,image = vc.read() #request the image
-	t2 = get_time() #time right after requesting the image
+	_,image,image_num,t1,t2 = cap.read() #request the image
 	image_time = t1 + (t2-t1) / 2.0 #timestamp the image as halfway between times before and after request
-	image_num += 1 #iterate the image number
 	tx_dict['pytracker'].put(
 		kind = 'data'
 		, payload = {
