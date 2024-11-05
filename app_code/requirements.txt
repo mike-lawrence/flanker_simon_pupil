@@ -9,7 +9,6 @@ PySDL2
 pysdl2-dll
 sounddevice
 SoundFile
-pyusb
 zarr
 scipy
 opencv-python

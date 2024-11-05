@@ -21,7 +21,15 @@ stim_display_res = (1920,1080) #pixel resolution of the window
 # stim_display_res = (2560,1440) #pixel resolution of the window
 stim_display_position_x = 0
 
-key_list = {'z':'left','/':'right'}
+# key_list = {'z':'left','/':'right'}
+# response_list = ['z','/']
+key_list = {'left':'left','right':'right'}
+response_list = ['left','right']
+trigger_left_axis = 2
+trigger_right_axis = 5
+trigger_criterion_value = -(2**16/4) # criterion at 25%
+
+
 target_location_list = ['left','right','up','down']
 target_list = ['black','white']
 flankers_list = ['congruent','incongruent','neutral','neutral']
@@ -103,6 +111,13 @@ pid = os.getpid()
 # Initialize the timer
 ########
 sdl2.SDL_Init(sdl2.SDL_INIT_TIMER)
+
+########
+# Initialize the gamepad 
+########
+sdl2.SDL_Init(sdl2.SDL_INIT_JOYSTICK)
+gamepad = sdl2.SDL_JoystickOpen(0)
+
 
 ########
 # Initialize the window
@@ -253,24 +268,115 @@ def get_time():
 def elapsed_since_ref_greater_than_crit(last,crit):
 	return((get_time()-last)>crit)
 
-#define a function to wait relative to some reference time
-def wait(duration,reference_time):
-	while not elapsed_since_ref_greater_than_crit(reference_time, duration):
-		# pass
-		sdl2.SDL_PumpEvents()
-		# sdl2.ext.get_events()
-
-#define a function that waits for a given duration to pass
-def simple_wait(duration):
-	wait(duration,get_time())
-
-
 #define a function that will kill everything safely
 def exit_safely():
 	tx_dict['parent'].put(kind='stop')
 	sdl2.ext.quit()
 	sys.exit()
 
+# class to handle a single trigger
+class single_trigger_class:
+	def __init__(self,name):
+		self.name = name
+		self.last_value = -2**16
+		self.last_response_time = None
+		self.response_made = False
+		self.response_finished = False
+	def process_input(self,value,last_pump_time):
+		# print(f'{self.name} trigger value: {value}')
+		#send data to writer
+		tx_dict['writer'].put(
+			kind = "data"
+			, payload = {
+				"dset_name" : 'triggers'
+				, "value" : np.array(
+					[[
+						last_pump_time
+						, trigger_col_info['trigger']['mapping'][self.name] 
+						, value
+					]]
+					, dtype = np.float64
+				)
+			}
+		)
+		#check if input reflects a "response"
+		if self.response_made & (not self.response_finished):
+			if (value<self.last_value) & (value<trigger_criterion_value):
+				self.response_finished = True
+				# debug.print(f'{self.name} trigger released')
+		else:
+			if not self.response_made:
+				if (value>self.last_value) & (value>trigger_criterion_value):
+					self.response_made = True
+					self.last_response_time = last_pump_time
+					# debug.print(f'{self.name} trigger pressed')
+		self.last_value = value
+	def reset_response(self):
+		self.response_made = False
+		self.response_finished = False
+
+
+#class to handle both triggers together
+class both_triggers_class:
+	def __init__(self):
+		self.left_trigger_dict_name = str(trigger_left_axis)
+		self.right_trigger_dict_name = str(trigger_right_axis)
+		self.triggers = {
+			self.left_trigger_dict_name : single_trigger_class('left')
+			, self.right_trigger_dict_name : single_trigger_class('right')
+		}
+	def process_input(self):
+		sdl2.SDL_PumpEvents()
+		last_pump_time = get_time()
+		for event in sdl2.ext.get_events():
+			if event.type==sdl2.SDL_KEYDOWN:
+				response = sdl2.SDL_GetKeyName(event.key.keysym.sym).lower().decode()
+				if response=='escape':
+					exit_safely()
+			elif event.type == sdl2.SDL_JOYAXISMOTION:
+				# debug.print(f'Axis {event.jaxis.axis} value: {event.jaxis.value}')
+				self.triggers[str(event.jaxis.axis)].process_input(event.jaxis.value,last_pump_time)
+	def reset_responses(self):
+		for trigger in self.triggers.values():
+			trigger.reset_response()
+	def clear_residual_input(self):
+		self.process_input()
+		self.reset_responses()
+	def check_for_dual_response(self):
+		if self.triggers[self.right_trigger_dict_name].response_finished & self.triggers[self.right_trigger_dict_name].response_finished:
+			#check that the last response time is within 0.5s of eachother
+			if abs(self.triggers[self.right_trigger_dict_name].last_response_time - self.triggers[self.left_trigger_dict_name].last_response_time)<0.5:
+				result = True
+			else:
+				result = False
+				debug.print('Dual response not simultaneous')
+			self.reset_responses()
+		else:
+			result = False
+		return(result)
+	def check_for_response(self):
+		self.process_input()
+		responses = []
+		for trigger in self.triggers.values():
+			if trigger.response_made:
+				responses.append({
+					'name' : trigger.name
+					, 'time' : trigger.last_response_time
+			})
+		self.reset_responses()
+		return responses
+
+both_triggers_obj = both_triggers_class()
+
+#define a function to wait relative to some reference time
+def wait(duration,reference_time):
+	while not elapsed_since_ref_greater_than_crit(reference_time, duration):
+		# pass
+		both_triggers_obj.process_input()
+
+#define a function that waits for a given duration to pass
+def simple_wait(duration):
+	wait(duration,get_time())
 
 def clear_screen(color):
 	sdl2.ext.fill(window_surf.contents,color)
@@ -314,6 +420,10 @@ def wait_for_response():
 				if response=='escape':
 					exit_safely()
 				else:
+					done = True
+			#check for gamepad buttons
+			elif event.type==sdl2.SDL_JOYBUTTONDOWN:
+					response = 'button'
 					done = True
 	return response
 
@@ -398,7 +508,7 @@ def refresh_windows():
 
 
 #define a function that prints a message on the window while looking for user input to continue. The function returns the total time it waited
-def show_message(my_text,lock_wait=False):
+def show_message(my_text,whitelist=None):
 	# print(my_text)
 	# print(lock_wait)
 	message_viewing_time_start = get_time()
@@ -409,9 +519,9 @@ def show_message(my_text,lock_wait=False):
 	simple_wait(0.500)
 	refresh_windows()
 	clear_screen(black)
-	if lock_wait:
+	if whitelist is not None:
 		response = None
-		while response not in ['return','y','n']:
+		while response not in whitelist:
 			response = wait_for_response()
 	else:
 		response = wait_for_response()
@@ -423,7 +533,7 @@ def show_message(my_text,lock_wait=False):
 
 
 #define a function that requests user input
-def get_input(get_what):
+def get_input(get_what,whitelist=None):
 	get_what = get_what+'\n'
 	text_input = ''
 	clear_screen(black)
@@ -450,7 +560,13 @@ def get_input(get_what):
 						draw_text(my_text, instruction_font, light_grey)
 						refresh_windows()
 				elif response == 'return':
-					done = True
+					# debug.print(f'whitelist: {whitelist}')
+					# debug.print(f'text_input: {text_input}')
+					if whitelist is not None:
+						if text_input in whitelist:
+							done = True
+					else:
+						done = True
 				else:
 					text_input = text_input + response
 					my_text = get_what+text_input
@@ -574,28 +690,12 @@ def check_for_stop():
 		if message.kind == 'stop':
 			exit_safely()
 
-def check_triggers():
-	responses = []
-	while not rx_dict['input'].empty():
-		message = rx_dict['input'].get()
-		if message.kind=='trigger':
-			responses.append(message.payload)
-			# print(message.payload)
-	return responses
 
 def wait_for_dual_triggers():
-	left_trigger = False
-	right_trigger = False
-	while not (left_trigger & right_trigger):
-		responses = check_triggers()
-		if len(responses):
-			for response in responses:
-				if response['response']=='left':
-					debug.print('left trigger (waiting for dual)')
-					left_trigger = True
-				elif response['response']=='right':
-					debug.print('right trigger (waiting for dual)')
-					right_trigger = True
+	while True:
+		both_triggers_obj.process_input()
+		if both_triggers_obj.check_for_dual_response():
+			break
 
 
 
@@ -629,7 +729,7 @@ def run_block(block):
 		target_location,target,flankers,simon,target_hand = trial_list.pop()
 
 		#clear any input still queued
-		check_triggers()
+		both_triggers_obj.clear_residual_input()
 
 		#present the fixation
 		double_draw_fixation()
@@ -712,14 +812,14 @@ def run_block(block):
 		# 			elif message.kind=='saccade':
 		# 				feedback_text = "Move\ndetected"
 		#check for any pre-target input
-		responses = check_triggers()
+		responses = both_triggers_obj.check_for_response()
 		if len(responses)>0:
 			stop_trial = True
 			feedback_text = 'Too\nsoon'
 		# stop the trial if there was a blink, saccade, or premature response
 		if stop_trial:
-			tx_dict['input_watcher'].put('reg_nice')
-			tx_dict['pytracker_cam'].put('reg_nice')
+			# tx_dict['input_watcher'].put('reg_nice')
+			# tx_dict['pytracker_cam'].put('reg_nice')
 			anticipation = 1
 			# print('anticipation')
 			#uncomment next two lines to *enable* recycling the trials
@@ -762,10 +862,10 @@ def run_block(block):
 			# 			elif message.kind=='saccade':
 			# 				feedback_text = "Move\ndetected"
 			# 			break # exit the waiting-for-response loop
-			responses = check_triggers()
+			responses = both_triggers_obj.check_for_response()
 			if len(responses)>0:
 				rt = responses[0]['time'] - target_on_time0
-				response = responses[0]['response']
+				response = responses[0]['name']
 				feedback_text = str(int(round(rt*1000)))
 				if response==black_response:
 					response = 'black'
@@ -778,8 +878,8 @@ def run_block(block):
 				else:
 					error = 1
 				break # exit the waiting-for-response loop
-		tx_dict['input_watcher'].put('reg_nice')
-		tx_dict['pytracker_cam'].put('reg_nice')
+		# tx_dict['input_watcher'].put('reg_nice')
+		# tx_dict['pytracker_cam'].put('reg_nice')
 
 		# present feedback & write data
 		do_feedback(feedback_text,feedback_color)		
@@ -817,15 +917,12 @@ tx_dict['writer'].put(kind='store_path_prefix',payload=id)
 # 	tx_dict['writer'].put(kind='edf_path',payload='../data/_' +id)
 
 # #counter-balance stimulus-response mapping
-mapping = int(get_input('Response-Color mapping (0 or 1):'))
+mapping = int(get_input('Response-Color mapping (0 or 1):',whitelist=['0','1']))
 
-# response_list = ['z','/']
-response_list = ['left','right']
-key_list = {'left':'left','right':'right'}
 white_response = response_list[mapping]
 black_response = response_list[1-mapping]
 
-show_message("Response-Color mapping:\n"+white_response+" = white\n"+black_response+" = black.\nPress any key to continue.")
+show_message("Response-Color mapping:\n"+white_response+" = white\n"+black_response+" = black.\nPress any key or button or to continue.")
 
 inputs = {
 	'id':id
@@ -893,6 +990,25 @@ for i,k in enumerate(col_info.keys()):
 
 tx_dict['writer'].put(kind="attr",payload={"dset_name":"exp","value":{'col_names':[k for k in col_info.keys()],'col_info':col_info,'inputs':inputs}})
 
+
+trigger_col_info = {
+	'time' : {}
+	, 'trigger' : {
+		'mapping': {
+			'left': 1
+			, 'right': 2
+		}
+	}
+	, 'value' : {}
+}
+
+# add column number:
+for i,k in enumerate(trigger_col_info.keys()):
+	trigger_col_info[k]['col_num'] = i+1
+
+tx_dict['writer'].put(kind="attr",payload={"dset_name":"triggers","value":{'col_names':[k for k in trigger_col_info.keys()],'col_info':trigger_col_info}})
+
+
 def manual_demo():
 	screen_num = 1
 	done = False
@@ -959,18 +1075,13 @@ def manual_demo():
 # Start the experiment
 ########
 
-do_auto_demo = 'y'==get_input('Attempt auto-demo? (y or n):')
-
-if do_auto_demo:
-	auto_demo()
-else:
-	manual_demo()
+# manual_demo()
 
 response = None
 while response!='n':
 	trash_response,message_viewing_time = show_message('When you are ready to begin practice, press any button.')
 	run_block(0)
-	response,message_viewing_time = show_message('Practice is complete.\nExperimenter: Repeat practice?',lock_wait=True)
+	response,message_viewing_time = show_message('Practice is complete.\nExperimenter: Repeat practice?',whitelist=['y','n'])
 
 response,message_viewing_time = show_message('When you are ready to begin the experiment, press any button.')
 

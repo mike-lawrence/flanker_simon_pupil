@@ -16,8 +16,6 @@ if __name__ == '__main__':
 	fam = family_class()
 	fam.child(file='exp.py')
 	fam.child(file='cpu.py')
-	fam.child(file='input.py')
-	fam.child(file='input_watcher.py')
 	# fam.child(file='eyelink.py')
 	fam.child(file='pytracker_cam.py')
 	fam.child(file='pytracker.py')
@@ -32,21 +30,9 @@ if __name__ == '__main__':
 	fam.q_connect(
 		rx_name_list=['writer']
 		, tx_name_list = [
-			'pytracker'
-			# 'eyelink'
-			, 'input'
-			, 'exp'
-			, 'cpu'
-		]
-	)
-
-
-	# all the input recipients (except writer, already connected above)
-	fam.q_connect(
-		tx_name_list=['input']
-		, rx_name_list = [
-			'pytracker'
-			# 'eyelink'
+			'cpu'
+			# , 'pytracker'
+			# , 'eyelink'
 			, 'exp'
 		]
 	)
@@ -55,18 +41,15 @@ if __name__ == '__main__':
 	# fam.q_connect(tx_name_list=['eyelink'],rx_name_list=['exp'])
 	# fam.q_connect(rx_name_list=['eyelink'],tx_name_list=['exp'])
 
-
-	fam.q_connect(tx_name_list=['input_watcher'],rx_name_list=['input'])
+	# connect pytracker_cam to pytracker
 	fam.q_connect(tx_name_list=['pytracker_cam'],rx_name_list=['pytracker'])
 
 	# connect exp and children whose niceness exp will control
-	fam.q_connect(tx_name_list=['exp'],rx_name_list=['input_watcher'])
-	fam.q_connect(tx_name_list=['exp'],rx_name_list=['pytracker_cam'])
+	# fam.q_connect(tx_name_list=['exp'],rx_name_list=['pytracker_cam'])
 
 	# connect pytracker_cam to pytracker_cal and vice versa
 	# fam.q_connect(tx_name_list=['pytracker_cam'],rx_name_list=['pytracker_cal'])
 	# fam.q_connect(tx_name_list=['pytracker_cal'],rx_name_list=['pytracker_cam'])
-
 
 	fam.start_and_monitor() #loops until all children self-terminate
 	sys.exit()
