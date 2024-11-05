@@ -56,7 +56,7 @@ tbls_bak = tbls
 	tbls$triggers
 	%>% mutate(
 		across(
-			c('t1','t2')
+			c('time')
 			, ~ .x - tbls$exp$trial_start_time[1]
 		)
 	)
@@ -242,9 +242,6 @@ tbls_bak = tbls
 
 (
 	tbls$trigger
-	%>% mutate(
-		time = (t1+t2)/2
-	)
 	%>% left_join(
 		tbls$exp
 		, join_by(closest(time >= trial_start_time))
@@ -264,7 +261,8 @@ tbls_bak = tbls
 
 (
 	tbls$trigger
-	%>% filter(time<10)
+	# %>% filter(time<10)
+	%>% filter(trial_num==4)
 	%>% ggplot(
 		aes(
 			x = time
@@ -283,18 +281,27 @@ tbls_bak = tbls
 	%>% mutate(
 		.by = trigger
 		, dt = c(NA,diff(time))
+		, dv = c(NA,diff(value))
 	)
 	%>% filter(!is.na(dt))
+	%>% filter(!is.na(dv))
 	%>% mutate(
-		dt_col = case_when(
+		dt_grp = case_when(
 			dt<.02 ~ 'fast'
 			, dt<.2 ~ 'medium'
 			, TRUE ~ 'slow'
 		)
+		, dv_grp = case_when(
+			dv>0 ~ 'increasing'
+			, dv<0 ~ 'decreasing'
+			, TRUE ~ 'other'
+		)
 	)
-	# %>% filter(dt<.2)
-	# %>% ggplot()
-	# + geom_histogram(aes(x=dt),bins=100)
+	# %>% filter(dt<1)
+	%>% filter(dt<.05)
+	%>% ggplot()
+	+ facet_grid(dv_grp~.)
+	+ geom_histogram(aes(x=dt),bins=100))
 	# %>% filter(trial_num==5)
 	# %>% filter(trigger=='right')
 	%>% ggplot(
@@ -310,8 +317,8 @@ tbls_bak = tbls
 	+ geom_line(alpha = .5)
 	# + geom_point(
 	# 	aes(
-	# 		colour = dt_col
-	# 		, group = interaction(trial_num,dt_col)
+	# 		colour = dt_grp
+	# 		, group = interaction(trial_num,dt_grp)
 	# 	)
 	# 	, alpha = .5
 	# )

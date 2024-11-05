@@ -6,9 +6,6 @@ grp_to_tbl = function(grp,z){
 		inputs_tbl = attrs$inputs %>% as_tibble()
 	}
 	col_names = unlist(attrs$col_names)
-	if(grp=='exp'){
-		col_names = c(col_names[1:2],'trial_start_time',col_names[3:15])
-	}
 	mapping_list = attrs$col_info
 	map_values_reversed <- function(column, mapping) {
 		if (!is.null(mapping$mapping)) {
