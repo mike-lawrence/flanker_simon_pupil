@@ -3,7 +3,7 @@ bleak
 matplotlib
 numpy
 Pillow
-Pillow-SIMD
+# Pillow-SIMD
 psutil
 PySDL2
 pysdl2-dll
