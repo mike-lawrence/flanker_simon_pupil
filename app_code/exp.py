@@ -334,8 +334,9 @@ class both_triggers_class:
 				if response=='escape':
 					exit_safely()
 			elif event.type == sdl2.SDL_JOYAXISMOTION:
-				# debug.print(f'Axis {event.jaxis.axis} value: {event.jaxis.value}')
-				self.triggers[str(event.jaxis.axis)].process_input(event.jaxis.value,last_pump_time)
+				if str(event.jaxis.axis) in self.triggers.keys():
+					# debug.print(f'Axis {event.jaxis.axis} value: {event.jaxis.value}')
+					self.triggers[str(event.jaxis.axis)].process_input(event.jaxis.value,last_pump_time)
 	def reset_responses(self):
 		for trigger in self.triggers.values():
 			trigger.reset_response()
