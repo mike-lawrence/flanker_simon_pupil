@@ -54,8 +54,8 @@ def get_time():
 
 
 class VideoCapture:
-	def __init__(self):
-		self.cap = cv2.VideoCapture(cam_index,cv2.CAP_V4L)
+	def __init__(self, cam_index=0, cam_fps=30, cam_res=(1280, 720)):
+		self.cap = cv2.VideoCapture(cam_index, cv2.CAP_V4L)
 		self.cap.set(cv2.CAP_PROP_FPS, cam_fps)
 		self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, cam_res[0])
 		self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cam_res[1])
@@ -63,24 +63,31 @@ class VideoCapture:
 		self.t1 = get_time()
 		self.ret, self.frame = self.cap.read()
 		self.t2 = get_time()
-		self.stopped = False
 		self.image_num = 1
+		self.stop_event = threading.Event()  # Use an Event to signal stopping
 	def start(self):
-		threading.Thread(target=self.update, daemon=True).start()
-		return(self)
+		self.thread = threading.Thread(target=self.update, daemon=True)
+		self.thread.start()
+		return self
 	def update(self):
-		while not self.stopped:
-			self.t1 = get_time()
-			self.ret, self.frame = self.cap.read()
-			self.t2 = get_time()
-			self.image_num += 1
+		try:
+			while not self.stop_event.is_set():  # Check if stop event is set
+				self.t1 = get_time()
+				self.ret, self.frame = self.cap.read()
+				self.t2 = get_time()
+				self.image_num += 1
+				filename = os.path.join('../frames', f"frame_{self.image_num}.npy")
+				np.save(filename, self.frame)
+				time.sleep(0.0001)  # Optional: small sleep to reduce CPU usage
+		finally:
+			self.cap.release()  # Ensure release when loop exits
 	def read(self):
-		return([self.ret, self.frame, self.image_num, self.t1, self.t2])
+		return [self.ret, self.frame, self.image_num, self.t1, self.t2]
 	def stop(self):
-		self.stopped = True
-		self.cap.release()
+		self.stop_event.set()  # Signal the thread to stop
+		self.thread.join()  # Wait for the thread to finish
 
-cap = VideoCapture().start()
+cap = VideoCapture(cam_fps=cam_fps,cam_res = cam_res).start()
 
 #define a function to exit safely
 def exit_safely():

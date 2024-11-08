@@ -15,7 +15,7 @@ export logfile=../logs/console_`date +"%FT%T"`.log
 #redirect output to log file (from: https://serverfault.com/a/103569/72634)
 if [ -z "$SCRIPT" ]
 then 
-    /usr/bin/script -f $logfile /bin/bash -c "./install_and_run.sh $*"
+    /usr/bin/script -f -c "./install_and_run.sh $*" "$logfile"
     read -p "" x && exit 0
 fi
 

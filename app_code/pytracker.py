@@ -377,8 +377,8 @@ settings_window.refresh()
 #create some settings 
 settings_dict = {}
 settings_dict['blink'] = setting_text(value=75, x=font_size, y=font_size, text='Blink (0-100) = ')
-settings_dict['blur'] = setting_text(value=3, x=font_size, y=font_size*2, text='Blur (0-; odd only) = ')
-settings_dict['filter'] = setting_text(value=3, x=font_size, y=font_size*3, text='Filter (0-; odd only) = ')
+settings_dict['blur'] = setting_text(value=5, x=font_size, y=font_size*2, text='Blur (0-; odd only) = ')
+settings_dict['filter'] = setting_text(value=5, x=font_size, y=font_size*3, text='Filter (0-; odd only) = ')
 settings_dict['saccade0'] = setting_text(value=50, x=font_size, y=font_size*4, text='Saccade (0-) = ')
 settings_dict['saccade'] = setting_text(value=1, x=font_size, y=font_size*5, text='Calibrated Saccade (0-) = ')
 
@@ -403,7 +403,7 @@ do_haar_face = False
 clicking_for_dots = False
 calibrating = False
 done_calibration = False
-do_sounds = True
+do_sounds = False
 queue_data_to_parent = False
 
 #set dummy calibration coefficients (yields untransformed pixel locs)
@@ -456,7 +456,8 @@ while True:
 	image_time = message.payload['image_time']
 	image_num = message.payload['image_num']
 	bgr = message.payload['bgr']
-
+	# filename = os.path.join('frames', f"frame_{image_num}.npy")
+	# np.save(filename, image)
 	#process input
 	sdl2.SDL_PumpEvents()
 	for event in sdl2.ext.get_events():
@@ -560,10 +561,10 @@ while True:
 							settings_window.hide()
 						else:
 							settings_window.show()
-					elif clickable_text_dict['auto'].is_active:
-						waiting_for_haar = False
-						do_haar = True
-						dot_list = [] 
+					# elif clickable_text_dict['auto'].is_active:
+					# 	waiting_for_haar = False
+					# 	do_haar = True
+					# 	dot_list = [] 
 					elif clickable_text_dict['init'].is_active:
 						clicking_for_dots = True
 						clicking_for_fid = True

@@ -42,9 +42,9 @@ if 'rx_dict' not in locals():
 ########
 
 viewing_distance = 40.0 #units can be anything so long as they match those used in windowWidth below
-stim_display_width = 40.0 #units can be anything so long as they match those used in viewingDistance above
+stim_display_width = 54.0 #units can be anything so long as they match those used in viewingDistance above
 stim_display_res = (1920,1080) #pixel resolution of the window
-stim_display_position_x = 0
+stim_display_position_x = 1081
 
 calibration_dot_size_in_degrees = .5 #specify the width of the fixation stimulus
 
@@ -121,8 +121,8 @@ sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO)
 window = sdl2.ext.Window(
 	"eyelink"
 	, size = stim_display_res
-	, position = [0,0]
-	# , position = (windowPositionX,0)
+	# , position = [0,0]
+	, position = (stim_display_position_x,0)
 	, flags = 
 		sdl2.SDL_WINDOW_SHOWN
 		| sdl2.SDL_WINDOW_BORDERLESS
@@ -332,6 +332,10 @@ eyelink.sendCommand('sample_rate 250')
 eyelink.setLinkEventFilter("SACCADE,BLINK")
 eyelink.sendCommand("saccade_velocity_threshold = 30") # docs recommend 30 for cognitive
 eyelink.sendCommand("saccade_acceleration_threshold = 9500") # docs recommend 9500 for cognitive
+
+eyelink.sendCommand("calibration_area_proportion .5 .2") 
+eyelink.sendCommand("validation_area_proportion .5 .2") 
+
 
 #screen_pixel_coords
 # sets the gaze-position coordinate system, which is used for all calibration target locations and drawing commands
